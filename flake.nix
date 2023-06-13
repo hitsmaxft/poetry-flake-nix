@@ -1,24 +1,43 @@
 {
   description = "poetry";
 
-
   inputs = {
       nixpkgs.url = "github:NixOS/nixpkgs";
       utils.url = "github:numtide/flake-utils";
       poetry2nix-src.url = "github:nix-community/poetry2nix";
-      poetry-src.url = "github:python-poetry/poetry/1.5";
+      flake-compat = {
+        url = "github:edolstra/flake-compat";
+        flake = false;
+      };
   };
 
-  outputs = { nixpkgs, utils, poetry2nix-src, poetry-src, self }: utils.lib.eachDefaultSystem (system:
+  outputs = {
+    nixpkgs, utils, poetry2nix-src, flake-compat, self }:
+    let 
+      systems = ["x86_64-linux" "x86_64-darwin"];
+    in
+    utils.lib.eachSystem systems (system:
     let
-      inherit (poetry2nix-src.legacyPackages.${system}) mkPoetryApplication;
+
+      inherit (poetry2nix-src.legacyPackages.${system}) mkPoetryApplication mkPoetryEnv;
+
       pkgs = import nixpkgs { inherit system; overlays = [ poetry2nix-src.overlay ]; };
 
+      poetry-src = pkgs.fetchFromGitHub {
+        owner = "python-poetry";
+        repo = "poetry";
+        rev = "1.5.1";
+        hash = "sha256-1zqfGzSI5RDACSNcz0tLA4VKMFwE5uD/YqOkgpzg2nQ=";
+      };
 
     in {
-      defaultPackage = pkgs.poetry2nix.mkPoetryApplication {
+
+      inherit flake-compat;
+
+      defaultPackage = mkPoetryApplication {
         projectDir = "${poetry-src}/";
       };
+
 
       devShell = pkgs.mkShell {
 
@@ -29,7 +48,7 @@
           # Additional dev packages list here.
           nixpkgs-fmt
           nix-prefetch-git
-          (pkgs.poetry2nix.mkPoetryEnv {
+          (mkPoetryEnv {
             projectDir = "${poetry-src}/";
 
             editablePackageSources = {
@@ -40,4 +59,4 @@
       };
 
     });
-}
+  }
